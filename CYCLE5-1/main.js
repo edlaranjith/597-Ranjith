@@ -1,77 +1,26 @@
 const express = require('express');
-const { MongoClient, ObjectId } = require('mongodb');
-const bodyParser = require('body-parser');
-const path = require('path');
+const mongoose = require('mongoose');
+const dotenv = require('dotenv');
+const cors = require('cors');
+
+dotenv.config(); // Load environment variables
 
 const app = express();
-const PORT = 3000;
 
-app.use(bodyParser.urlencoded({ extended: true }));
-app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
+app.use(cors());
+app.use(express.json());
 
-const MONGO_URI = 'mongodb://127.0.0.1:27017';
-const DATABASE_NAME = 'SNIST';
+// Connect to MongoDB
+mongoose.connect(process.env.MONGO_URL)
+    .then(() => console.log("Connected to MongoDB"))
+    .catch((err) => console.log("Error connecting to MongoDB:", err));
 
-let db;
+// Routes
+app.use('/files', require('./routes/fileRoutes'));
 
-MongoClient.connect(MONGO_URI)
-    .then(client => {
-        console.log('Connected to MongoDB');
-        db = client.db(DATABASE_NAME);
-
-        app.listen(PORT, () => {
-            console.log(`Server running on http://localhost:${PORT}`);
-        });
-    })
-    .catch(err => console.error(err));
-
-/* ROUTES */
-
-// Home
-app.get('/', async (req, res) => {
-    const items = await db.collection('items').find().toArray();
-    res.render('index', { items });
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
 });
 
-// Create
-app.get('/create', (req, res) => {
-    res.render('create');
-});
 
-app.post('/create', async (req, res) => {
-    await db.collection('items').insertOne({
-        name: req.body.name,
-        description: req.body.description
-    });
-    res.redirect('/');
-});
-
-// Edit
-app.get('/edit/:id', async (req, res) => {
-    const item = await db.collection('items').findOne({
-        _id: new ObjectId(req.params.id)
-    });
-    res.render('edit', { item });
-});
-
-app.post('/edit/:id', async (req, res) => {
-    await db.collection('items').updateOne(
-        { _id: new ObjectId(req.params.id) },
-        {
-            $set: {
-                name: req.body.name,
-                description: req.body.description
-            }
-        }
-    );
-    res.redirect('/');
-});
-
-// Delete
-app.post('/delete/:id', async (req, res) => {
-    await db.collection('items').deleteOne({
-        _id: new ObjectId(req.params.id)
-    });
-    res.redirect('/');
-});
